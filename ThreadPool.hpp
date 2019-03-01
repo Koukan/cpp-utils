@@ -86,7 +86,11 @@ class ThreadPool
 
 
 // Definitions
+#if defined(_WIN32)
+__declspec(thread) static bool gl_continue = true;
+#else
 thread_local static bool gl_continue = true;
+#endif
 
 inline ThreadPool::ThreadPool(size_t nbThread)
 {
@@ -106,14 +110,14 @@ inline ThreadPool::~ThreadPool()
 
 inline void ThreadPool::pushTask(std::function<void()> task)
 {
-	std::lock_guard lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 	_tasks.emplace_back(task);
 	_condition_variable.notify_one();
 }
 
 inline void ThreadPool::pushPriorityTask(std::function<void()> task)
 {
-	std::lock_guard lock(_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 	_tasks.emplace_front(task);
 	_condition_variable.notify_one();
 }
@@ -143,7 +147,7 @@ inline size_t ThreadPool::getNbThread() const
 
 inline void ThreadPool::wait()
 {
-	std::unique_lock lock(_waiting_mutex);
+	std::unique_lock<std::mutex> lock(_waiting_mutex);
 	_waiting_condition_variable.wait(lock, [this] { return _tasks.empty(); });
 }
 
@@ -163,7 +167,7 @@ inline void ThreadPool::handleTask()
 {
 	while (gl_continue)
 	{
-		std::unique_lock lock(_mutex);
+		std::unique_lock<std::mutex> lock(_mutex);
 		if (_tasks.empty() && _working_thread_counter == 0)
 			_waiting_condition_variable.notify_all();
 		_condition_variable.wait(lock, [this] { return !_tasks.empty(); });
